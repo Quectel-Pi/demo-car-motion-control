@@ -1,0 +1,22 @@
+# Python 运行产物
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+.pytest_cache/
+
+# 编辑器 / 系统
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# 本地/板端运行日志
+*.log
+
+# 临时/备份/补丁残留
+*.orig
+*.rej
+*.bak
+~$*

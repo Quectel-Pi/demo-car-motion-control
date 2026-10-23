@@ -1,0 +1,14 @@
+# 换行与文件类型：仓库内统一 LF，二进制按原样存
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.mp4 binary
+*.webp binary
+
+# GitHub 语言统计：第三方库与素材不计入本项目代码
+web/vendor/* linguist-vendored
+assets/* linguist-documentation
+docs/* linguist-documentation

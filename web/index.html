@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wheel Control Demo · Quectel Pi M2</title>
+  <!--
+    亮色与深色共用这一份 markup（不再有两份几乎一样的 index-v2.html）：
+      /、/index.html        → 亮色皮肤 style.css
+      /dark、/dark.html     → 深色皮肤 style-v2.css（也可用 /?theme=dark）
+      /index-v2.html        → 旧路径，保留兼容，等价于 /dark.html
+    两份皮肤各自自包含、只换样式表，不换结构。深色专属的装饰元素
+    （ambient / idx 序号 / ver-pill / h1-suffix / joy-ticks）在亮色侧由
+    style.css 里的 html:not([data-theme="dark"]) 规则隐藏。
+  -->
+  <link rel="stylesheet" id="theme-css" href="/style.css">
+  <script>
+    (function () {
+      var dark = /\/(?:dark|index-v2)(?:\.html)?$/.test(location.pathname) ||
+                 /(?:^|[?&])theme=dark(?:&|$)/.test(location.search);
+      if (!dark) return;
+
+      /* 深色：只换样式表（此刻 body 还没解析，不会闪） */
+      document.documentElement.setAttribute('data-theme', 'dark');
+      document.getElementById('theme-css').href = '/style-v2.css';
+      document.title = 'Wheel Control · Dark (v2 preview) · Quectel Pi M2';
+
+      var meta = document.createElement('meta');
+      meta.setAttribute('name', 'theme-color');
+      meta.setAttribute('content', '#070d19');
+      document.head.appendChild(meta);
+
+      /* car3d.js 加载时读这个全局变量，决定 3D 舞台用深色还是浅色配色 */
+      window.WHEEL_STAGE_THEME = 'dark';
+    })();
+
+    /* 滑块进度填充：纯视觉，不参与控制逻辑（深色皮肤用 --fill 画进度） */
+    (function () {
+      if (!document.documentElement.hasAttribute('data-theme')) return;
+      function paint(el) {
+        if (!el || el.type !== 'range') return;
+        var min = Number(el.min || 0);
+        var max = Number(el.max || 100);
+        var p = max === min ? 0 : ((Number(el.value) - min) / (max - min)) * 100;
+        el.style.setProperty('--fill', p.toFixed(1) + '%');
+      }
+      function paintAll() {
+        var list = document.querySelectorAll('input[type=range]');
+        for (var i = 0; i < list.length; i += 1) paint(list[i]);
+      }
+      document.addEventListener('input', function (e) { paint(e.target); }, true);
+      window.addEventListener('DOMContentLoaded', paintAll);
+      window.addEventListener('load', paintAll);
+      setTimeout(paintAll, 600);
+      setTimeout(paintAll, 1600);
+    })();
+  </script>
+</head>
+<body>
+  <div class="ambient" aria-hidden="true">
+    <span class="ambient-glow ambient-glow-a"></span>
+    <span class="ambient-glow ambient-glow-b"></span>
+    <span class="ambient-grid"></span>
+  </div>
+
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">◎</div>
+      <div class="brand-text">
+        <h1>Wheel Control <span class="h1-plain">Demo</span><span class="h1-suffix">Mecanum</span></h1>
+        <p>Quectel Pi M2 · Hiwonder RasAdapter5 A · Mecanum wheels</p>
+      </div>
+      <a class="ver-pill" href="/index.html" title="Switch to the light page">light</a>
+    </div>
+    <div class="head-demo">
+      <select id="demo-select" class="head-select" aria-label="select demo sequence"></select>
+      <button class="btn btn-primary head-btn" id="btn-demo-start" type="button">Start</button>
+      <button class="btn btn-ghost head-btn" id="btn-demo-stop" type="button">Stop</button>
+      <span class="head-time" id="demo-time">0.0s / 0.0s</span>
+    </div>
+    <div class="head-progress"><div id="demo-progress"></div></div>
+  </header>
+
+  <div class="offline" id="offline-bar" hidden>Lost the server, retrying... (commands stopped)</div>
+
+  <main class="layout">
+    <section class="col col-left">
+      <div class="panel">
+        <div class="panel-head">
+          <h2><i class="idx">01</i>Manual control</h2>
+          <span class="panel-hint">Drag the stick · WASD · Q/E to turn · Space to stop · motion follows the command (estimated, no distance readout)</span>
+        </div>
+
+        <div class="manual-body">
+          <div class="joy-wrap">
+            <div class="joy" id="joy" tabindex="0" role="application" aria-label="direction joystick">
+              <div class="joy-cross"></div>
+              <div class="joy-ring"></div>
+              <div class="joy-ticks" aria-hidden="true"></div>
+              <div class="joy-knob" id="joy-knob"></div>
+              <span class="joy-dir joy-dir-up">FWD</span>
+              <span class="joy-dir joy-dir-down">REV</span>
+              <span class="joy-dir joy-dir-left">LEFT</span>
+              <span class="joy-dir joy-dir-right">RIGHT</span>
+            </div>
+            <div class="joy-meta">
+              <div class="readout">
+                <span class="readout-label">Heading</span>
+                <strong id="angle-text">000°</strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="sliders">
+            <label class="slider-row">
+              <span class="slider-label">Speed</span>
+              <input type="range" id="velocity" min="0" max="80" step="1" value="0">
+              <output id="velocity-out">0%</output>
+            </label>
+            <label class="slider-row">
+              <span class="slider-label">Spin</span>
+              <input type="range" id="rot" min="-60" max="60" step="1" value="0">
+              <output id="rot-out">0%</output>
+            </label>
+            <label class="switch-row">
+              <input type="checkbox" id="drift">
+              <span class="switch-ui"></span>
+              <span class="switch-text">Drift mode (rear wheels boosted)</span>
+            </label>
+            <div class="btn-row">
+              <button class="btn" id="btn-stop" type="button">Stop</button>
+              <button class="btn btn-ghost" id="btn-reset-aim" type="button">Center</button>
+            </div>
+            <div class="readout readout-wide">
+              <span class="readout-label">Action</span>
+              <strong id="action-text">Stopped</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <h2><i class="idx">02</i>Wheel check</h2>
+          <span class="panel-hint">Sliders set each wheel duty (%) for wiring/direction checks · motion follows the command (estimated, no distance readout)</span>
+        </div>
+        <div class="wheel-editor" id="wheel-editor"></div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" id="btn-wheel-zero" type="button">Zero all</button>
+          <span class="panel-hint inline" id="wheel-mode-hint">vector mode</span>
+        </div>
+      </div>
+
+      <details class="panel feedback-panel">
+        <summary class="panel-head">
+          <h2><i class="idx">03</i>Board feedback</h2>
+          <span class="panel-hint">SYS frame every ~200 ms (battery) · no encoders, speed is estimated</span>
+        </summary>
+        <div class="fb-grid">
+          <div class="fb-item">
+            <span class="fb-label">Battery</span>
+            <strong id="fb-battery">-</strong>
+            <em id="fb-battery-hint">pushed by the board (SYS frame)</em>
+          </div>
+
+          <div class="fb-item">
+            <span class="fb-label">Since last report</span>
+            <strong id="fb-age">-</strong>
+            <em id="fb-age-hint">flagged if no SYS frame for 2s</em>
+          </div>
+          <div class="fb-item">
+            <span class="fb-label">Frames / reports</span>
+            <strong id="fb-frames">0 / 0</strong>
+            <em>SYS battery reports</em>
+          </div>
+          <div class="fb-item">
+            <span class="fb-label">Board</span>
+            <strong id="fb-board">-</strong>
+            <em id="fb-proto">1 Mbps 8N1</em>
+          </div>
+        </div>
+        <div class="fb-unknown" id="fb-unknown" hidden></div>
+      </details>
+    </section>
+
+    <section class="col col-right">
+      <div class="panel stage-panel">
+        <div class="panel-head">
+          <h2><i class="idx">04</i>Wheel motion</h2>
+          <span class="panel-hint" id="stage-hint">live 3D: follows the commanded duties</span>
+        </div>
+        <div class="stage">
+          <canvas id="stage3d"></canvas>
+        </div>
+        <div class="wheel-readout" id="wheel-readout"></div>
+        <div class="command-line">
+          <span class="command-label">Command frame (0xAA55 · set_motor_duty)</span>
+          <code id="command-text">AA 55 03 16 05 04 …</code>
+        </div>
+      </div>
+
+      <div class="panel log-panel">
+        <div class="panel-head">
+          <h2><i class="idx">06</i>Event log</h2>
+          <span class="panel-hint">link / safety / demo state changes</span>
+        </div>
+        <ul class="log" id="log"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <span>API: <code>/api/status</code> · <code>/api/target</code> · <code>/api/raw</code> · <code>/api/demo/start</code> · <code>/api/estop</code></span>
+    <span id="footer-time">-</span>
+  </footer>
+
+  <script src="/vendor/three.min.js"></script>
+  <script src="/car3d.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
