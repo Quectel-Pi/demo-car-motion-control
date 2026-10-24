@@ -1,0 +1,28 @@
+[Unit]
+Description=demo-car-motion-control（Quectel Pi M2 + 幻尔树莓派5扩展板 A 款）
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# 板端运行用户：必须改。改完把下面路径里的 <user> 也换成同一用户名：
+#   sed -i "s|^User=.*|User=$USER|; s|<user>|$USER|g" demo-car-motion-control.service
+# 注意：路径不要用 %h —— 部分镜像在启动早期会把 %h 解析成 /root，导致 CHDIR 失败。
+User=CHANGE_ME
+WorkingDirectory=/home/<user>/projects/demo-car-motion-control
+Environment=PYTHONUNBUFFERED=1
+# M2 板载 UART1（40pin 第 8/10/9 脚）→ /dev/ttyS1；换 USB-TTL 时改成 /dev/ttyUSB0
+Environment=WHEELCTL_SERIAL=/dev/ttyS1
+# 板载固件固定 1 Mbps 8N1，改配置时保持一致
+Environment=WHEELCTL_BAUD=1000000
+ExecStart=/home/<user>/projects/demo-car-motion-control/run.sh --host 0.0.0.0 --port 8080
+# 退出时进程会先下发四轮 0 占空（板子未声明指令超时，必须由主机兜底）
+KillSignal=SIGTERM
+TimeoutStopSec=10
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

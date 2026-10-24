@@ -1,0 +1,148 @@
+{
+  "serial": {
+    "port": "auto",
+    "baud": 1000000,
+    "candidates": [
+      "/dev/ttyS1",
+      "/dev/ttyS4",
+      "/dev/ttyS0",
+      "/dev/ttyS2",
+      "/dev/ttyAMA0",
+      "/dev/serial0",
+      "/dev/ttyUSB0",
+      "/dev/ttyUSB1",
+      "/dev/ttyACM0",
+      "/dev/ttyACM1",
+      "COM3",
+      "COM4",
+      "COM5",
+      "COM6"
+    ],
+    "read_timeout_s": 0.02
+  },
+  "board": {
+    "max_speed_mm_s": 632.0,
+    "wheel_diameter_mm": 60.0,
+    "deadzone_pct": 15.0,
+    "apply_deadzone": true,
+    "battery_low_v": 6.9,
+    "battery_full_v": 8.4,
+    "battery_none_v": 1.0,
+    "telemetry_timeout_s": 2.0,
+    "motor_order": [
+      1,
+      2,
+      4,
+      3
+    ],
+    "motor_order_note": "车体序 [左前FL, 右前FR, 右后RR, 左后RL] → 电机编号。按现场接线：M1 左前 / M3 右前 / M4 右后 / M2 左后。配套 control.invert_angle=true + invert_rot=true（左右镜像补偿），使电机帧与已验证的行为一致。",
+    "motor_invert": [
+      false,
+      true,
+      false,
+      true
+    ],
+    "motor_invert_note": "按电机编号 M1..M4：M3/M4（右侧两轮）镜像安装，需取反才是前进",
+    "_speed_note": "标定值：55% x 2.0s 实测走 600mm，据此折算 max_speed_mm_s = 632",
+    "quiet_when_idle": true,
+    "_quiet_note": "停住后不再周期性重发同一帧，消除零占空时的 PWM 啸叫",
+    "_order_note": "车体序 FL/FR/RR/RL → 扩展板 M1/M2/M4/M3（幻尔标准接法：M1左前 M2右前 M3左后 M4右后）",
+    "_invert_note": "逐轮 +30% 观察得到：FL/RL 取反、FR/RR 保持 → invert=[F,T,F,T]（右侧两轮镜像安装）"
+  },
+  "control": {
+    "stream_hz": 20,
+    "idle_stream_hz": 5,
+    "command_hz": 20,
+    "refresh_s": 1.0,
+    "poll_s": 2.0,
+    "max_velocity": 80,
+    "max_rot": 60,
+    "invert_rot": true,
+    "invert_motors": true,
+    "invert_angle": true,
+    "heartbeat_timeout_s": 8.0,
+    "handshake_timeout_s": 2.5,
+    "invert_motors_note": "本车实测：四轮电机整体反接（正占空=轮子顶部朝车尾），故整车取反",
+    "invert_angle_note": "左右镜像补偿：angle=0/90/180/270 在此底盘需镜像，否则左平移会变向右",
+    "invert_rot_note": "左右镜像补偿：自转方向需取反，否则原地左转会变顺时针"
+  },
+  "demo": {
+    "velocity": 55,
+    "rot": 40,
+    "home": {
+      "side_mm": 300.0,
+      "turn_deg": 90.0,
+      "velocity": 55,
+      "rot": 20,
+      "deg_per_s_per_rot": 2.67,
+      "scale": 1.0,
+      "_note": "正方形归位参数：边长(mm)/转向角(°)/直行速度/自转速度/角速度系数/现场标定系数（实测偏大就调小 scale）",
+      "settle_s": 0.35,
+      "turn_trim_deg": 0.0,
+      "_calib_note": "角速度系数标定：rot=30% x 1.0s = 80.2°（3 次均值）→ 2.67",
+      "_rot_note": "自转速度：25% 惯性比 30% 小，闭环转角更容易一次到位",
+      "_safety_note": "转角后易堵转：转速降到 20%，并留 0.35s 停稳",
+      "_side_note": "300mm / 299mm/s = 1.0s"
+    },
+    "hidden": [
+      "spin",
+      "diag"
+    ],
+    "_hidden_note": "不想显示的演示名放这里（spin/diag 已隐藏）；从列表里去掉即可恢复",
+    "calib_mm": 300,
+    "_calib_note": "dist_check 定稿 300 mm（1.00 s @ 55%）；board.max_speed_mm_s=632 来自实测 2.0s→600mm。若实测有偏差，按 632×300/实测 缩放"
+  },
+  "web": {
+    "host": "0.0.0.0",
+    "port": 8080,
+    "fallback_ports": [
+      8090,
+      8091,
+      8092
+    ]
+  },
+  "sim": {
+    "force": false,
+    "battery_v": 7.9
+  },
+  "imu": {
+    "enabled": true,
+    "bus": 3,
+    "addr": 104,
+    "sign": 1.0,
+    "rate_hz": 100,
+    "calib_s": 1.5,
+    "turn_tol_deg": 2.5,
+    "_note": "MPU6050 陀螺仪（可选）。这台板子上扩展板 IIC 口 = /dev/i2c-3，地址 0x68。没有硬件时自动降级；左转角度为负时把 sign 改成 -1",
+    "calib_settle_s": 0.25,
+    "calib_always": false,
+    "_calib_note": "calib_always=False：只有含闭环转角步骤的演示（home_imu）才开始前自动校准；设为 True 则所有演示都校准",
+    "turn_lead_deg": 2.0,
+    "_lead_note": "turn_lead_deg=小提前量；settle_rate_dps=判定停稳的角速度阈值（°/s）",
+    "settle_rate_dps": 15.0,
+    "turn_kp": 1.1,
+    "turn_kd": 0.45,
+    "turn_deadband_deg": 3.0,
+    "_pd_note": "闭环转角 PD：kp 比例、kd 阻尼（抑制来回摆）、deadband 死区（°）",
+    "turn_fine_deg": 6.0,
+    "turn_fine_rot": 12,
+    "turn_done_deg": 1.2,
+    "_fine_note": "精调占空 12%；1.8s 后仍差 >2 度 则翻倍（上限 18）",
+    "heading_hold": true,
+    "hold_gain": 0.6,
+    "hold_max_rot": 3,
+    "_hold_note": "heading_hold=true：**仅直行(0°/180°)** 用 IMU 做小幅航向修正（最多 ±3% 自转）；斜行/平移/漂移不做；IMU 不可用时自动退化为开环，不中止演示",
+    "turn_min_pulse": 8,
+    "_pulse_note": "精调最小脉冲 6%（低于此值车推不动）；kd 0.38 提前刹车减少滑行",
+    "_approach_note": "接近目标自动降速 + 到位需同时满足角度和转速",
+    "turn_kp_fine": 1.6,
+    "_stall_note": "精调：kp 1.6 + 最小脉冲 8%，卡住时每 0.125s 再加 1%（上限 18%）",
+    "_kick_note": "精调卡住 >0.45s 时改用 22% 短脉冲（0.12s 出/0.3s 停）越过静摩擦"
+  },
+  "stall_guard": {
+    "enabled": false,
+    "drop_mv": 800,
+    "hold_s": 1.0,
+    "_note": "当前默认关闭：转弯电流波动会误触发。需要时把 enabled 改 true（阈值 800mV/1.0s）。真正的危险场景（顶着障碍转弯）由 IMU 转角冻结检测兜底：heading 0.4s 不变即中止演示。"
+  }
+}
